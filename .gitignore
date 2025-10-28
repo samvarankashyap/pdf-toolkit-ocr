@@ -62,6 +62,9 @@ secrets.yaml
 *.pdf
 
 # Text Output Files (all .txt files ignored)
+# But keep requirements files for CI/CD
+!requirements.txt
+!requirements-dev.txt
 *.txt
 
 # Processing Folders
