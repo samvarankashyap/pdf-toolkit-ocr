@@ -94,9 +94,10 @@ class TestPDFToImageConverter(unittest.TestCase):
         self.assertIn("Input file not found", str(context.exception))
 
     @patch('pdf_toolkit.PDF_TO_IMAGE_AVAILABLE', True)
-    @patch('pdf_toolkit.convert_from_path')
+    @patch('pdf_toolkit.PYPDFIUM2_AVAILABLE', True)
+    @patch('pdf_toolkit.PDFToImageConverter._convert_with_pypdfium2')
     @patch('pdf_toolkit.img2pdf.convert')
-    def test_convert_success(self, mock_img2pdf, mock_convert_from_path):
+    def test_convert_success(self, mock_img2pdf, mock_convert_backend):
         """Test successful PDF to image conversion"""
         # Create test PDF file
         self.test_pdf.touch()
@@ -106,24 +107,23 @@ class TestPDFToImageConverter(unittest.TestCase):
         mock_image.mode = 'RGB'
         mock_image.save = MagicMock()
 
-        mock_convert_from_path.return_value = [mock_image, mock_image]
+        mock_convert_backend.return_value = [mock_image, mock_image]
         mock_img2pdf.return_value = b'fake pdf bytes'
 
         converter = PDFToImageConverter(dpi=200, jpeg_quality=95)
         output_path = converter.convert(self.test_pdf)
 
-        # Verify conversion was called with correct parameters
-        mock_convert_from_path.assert_called_once()
-        args, kwargs = mock_convert_from_path.call_args
-        self.assertEqual(kwargs.get('dpi') or args[1], 200)
+        # Verify backend conversion was called
+        mock_convert_backend.assert_called_once()
 
         # Verify output file was created
         self.assertTrue(output_path.exists())
         self.assertTrue(output_path.name.endswith('_image.pdf'))
 
     @patch('pdf_toolkit.PDF_TO_IMAGE_AVAILABLE', True)
-    @patch('pdf_toolkit.convert_from_path')
-    def test_convert_with_image_mode_conversion(self, mock_convert_from_path):
+    @patch('pdf_toolkit.PYPDFIUM2_AVAILABLE', True)
+    @patch('pdf_toolkit.PDFToImageConverter._convert_with_pypdfium2')
+    def test_convert_with_image_mode_conversion(self, mock_convert_backend):
         """Test conversion handles different image modes"""
         self.test_pdf.touch()
 
@@ -132,7 +132,7 @@ class TestPDFToImageConverter(unittest.TestCase):
         mock_image.mode = 'CMYK'
         mock_image.convert = MagicMock(return_value=mock_image)
 
-        mock_convert_from_path.return_value = [mock_image]
+        mock_convert_backend.return_value = [mock_image]
 
         with patch('pdf_toolkit.img2pdf.convert', return_value=b'fake pdf'):
             converter = PDFToImageConverter()
@@ -142,12 +142,13 @@ class TestPDFToImageConverter(unittest.TestCase):
             mock_image.convert.assert_not_called()
 
     @patch('pdf_toolkit.PDF_TO_IMAGE_AVAILABLE', True)
-    @patch('pdf_toolkit.convert_from_path')
-    def test_convert_cleanup_on_failure(self, mock_convert_from_path):
+    @patch('pdf_toolkit.PYPDFIUM2_AVAILABLE', True)
+    @patch('pdf_toolkit.PDFToImageConverter._convert_with_pypdfium2')
+    def test_convert_cleanup_on_failure(self, mock_convert_backend):
         """Test cleanup happens when conversion fails"""
         self.test_pdf.touch()
 
-        mock_convert_from_path.side_effect = Exception("Conversion error")
+        mock_convert_backend.side_effect = Exception("Conversion error")
 
         converter = PDFToImageConverter()
         output_path = Path(self.temp_dir) / "test_image.pdf"
@@ -159,15 +160,16 @@ class TestPDFToImageConverter(unittest.TestCase):
         self.assertFalse(output_path.exists())
 
     @patch('pdf_toolkit.PDF_TO_IMAGE_AVAILABLE', True)
-    @patch('pdf_toolkit.convert_from_path')
+    @patch('pdf_toolkit.PYPDFIUM2_AVAILABLE', True)
+    @patch('pdf_toolkit.PDFToImageConverter._convert_with_pypdfium2')
     @patch('pdf_toolkit.img2pdf.convert')
-    def test_convert_custom_output_path(self, mock_img2pdf, mock_convert_from_path):
+    def test_convert_custom_output_path(self, mock_img2pdf, mock_convert_backend):
         """Test conversion with custom output path"""
         self.test_pdf.touch()
 
         mock_image = MagicMock()
         mock_image.mode = 'RGB'
-        mock_convert_from_path.return_value = [mock_image]
+        mock_convert_backend.return_value = [mock_image]
         mock_img2pdf.return_value = b'fake pdf bytes'
 
         converter = PDFToImageConverter()
@@ -536,9 +538,10 @@ class TestMainFunction(unittest.TestCase):
         mock_exit.assert_called_once_with(1)
 
     @patch('pdf_toolkit.PDF_TO_IMAGE_AVAILABLE', True)
-    @patch('pdf_toolkit.convert_from_path')
+    @patch('pdf_toolkit.PYPDFIUM2_AVAILABLE', True)
+    @patch('pdf_toolkit.PDFToImageConverter._convert_with_pypdfium2')
     @patch('pdf_toolkit.img2pdf.convert')
-    def test_main_convert_command(self, mock_img2pdf, mock_convert):
+    def test_main_convert_command(self, mock_img2pdf, mock_convert_backend):
         """Test main function with convert command"""
         test_pdf = Path(self.temp_dir) / "test.pdf"
         test_pdf.touch()
@@ -546,7 +549,7 @@ class TestMainFunction(unittest.TestCase):
         # Mock image conversion
         mock_image = MagicMock()
         mock_image.mode = 'RGB'
-        mock_convert.return_value = [mock_image]
+        mock_convert_backend.return_value = [mock_image]
         mock_img2pdf.return_value = b'fake pdf'
 
         with patch('sys.argv', ['pdf_toolkit.py', 'convert', str(test_pdf)]):
@@ -650,13 +653,14 @@ class TestEdgeCases(unittest.TestCase):
             self.assertEqual(len(chunks), 2)
 
     @patch('pdf_toolkit.PDF_TO_IMAGE_AVAILABLE', True)
-    @patch('pdf_toolkit.convert_from_path')
-    def test_convert_empty_pdf(self, mock_convert):
+    @patch('pdf_toolkit.PYPDFIUM2_AVAILABLE', True)
+    @patch('pdf_toolkit.PDFToImageConverter._convert_with_pypdfium2')
+    def test_convert_empty_pdf(self, mock_convert_backend):
         """Test converting PDF with no pages"""
         test_pdf = Path(self.temp_dir) / "test.pdf"
         test_pdf.touch()
 
-        mock_convert.return_value = []  # No pages
+        mock_convert_backend.return_value = []  # No pages
 
         with patch('pdf_toolkit.img2pdf.convert', return_value=b''):
             converter = PDFToImageConverter()
@@ -698,10 +702,11 @@ class TestIntegration(unittest.TestCase):
             shutil.rmtree(self.temp_dir)
 
     @patch('pdf_toolkit.PDF_TO_IMAGE_AVAILABLE', True)
+    @patch('pdf_toolkit.PYPDFIUM2_AVAILABLE', True)
     @patch('pdf_toolkit.GOOGLE_OCR_AVAILABLE', True)
-    @patch('pdf_toolkit.convert_from_path')
+    @patch('pdf_toolkit.PDFToImageConverter._convert_with_pypdfium2')
     @patch('pdf_toolkit.img2pdf.convert')
-    def test_full_convert_then_ocr_workflow(self, mock_img2pdf, mock_convert):
+    def test_full_convert_then_ocr_workflow(self, mock_img2pdf, mock_convert_backend):
         """Test complete workflow: convert then OCR"""
         test_pdf = Path(self.temp_dir) / "test.pdf"
         test_pdf.touch()
@@ -709,7 +714,7 @@ class TestIntegration(unittest.TestCase):
         # Mock conversion
         mock_image = MagicMock()
         mock_image.mode = 'RGB'
-        mock_convert.return_value = [mock_image]
+        mock_convert_backend.return_value = [mock_image]
         mock_img2pdf.return_value = b'fake pdf'
 
         # Step 1: Convert
