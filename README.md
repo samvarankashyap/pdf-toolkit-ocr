@@ -4,13 +4,19 @@ A unified command-line tool that combines PDF to Image conversion and Google Dri
 
 ## Features
 
-### 1. PDF to Image PDF Conversion
+### 1. Multiple PDF Rendering Backends 🆕
+- **No Poppler installation required!** (when using pypdfium2 or PyMuPDF)
+- Choose from 3 backends: pypdfium2 (recommended), PyMuPDF, or pdf2image
+- Auto-selects best available backend
+- See [BACKENDS.md](BACKENDS.md) for detailed comparison
+
+### 2. PDF to Image PDF Conversion
 - Converts text-based PDFs to high-quality image-based PDFs
 - Configurable DPI (default: 200) and JPEG quality (default: 95)
 - Useful for PDFs with text extraction/copy-paste issues
 - Automatic file size reporting
 
-### 2. Google Drive OCR Processing with Automatic Image Conversion
+### 3. Google Drive OCR Processing with Automatic Image Conversion
 - **Automatically converts PDFs to high-quality image PDFs before OCR for better accuracy**
 - Performs OCR using Google Drive API
 - Automatic PDF chunking for large files (default: 10 pages per chunk)
@@ -18,7 +24,7 @@ A unified command-line tool that combines PDF to Image conversion and Google Dri
 - Batch processing with timestamped folders
 - Support for PDF, JPG, PNG, GIF, BMP, and DOC files
 
-### 3. Organized Output Structure
+### 4. Organized Output Structure
 - Each PDF gets its own processing folder: `<filename>_processing/`
 - Batch operations create timestamped folders: `batch_processing_YYYYMMDD_HHMMSS/`
 - All intermediate files (chunks, converted PDFs) organized in dedicated folders
@@ -26,24 +32,41 @@ A unified command-line tool that combines PDF to Image conversion and Google Dri
 
 ## Installation
 
-### Prerequisites
+### Quick Start (Recommended)
 
-Install required Python packages:
+**No external dependencies needed with pypdfium2!**
 
 ```bash
-# For PDF to Image conversion
-pip install pdf2image pillow img2pdf
+# Install with pypdfium2 backend (easiest, no Poppler needed)
+pip install pypdfium2 pillow img2pdf google-api-python-client oauth2client PyPDF2 packaging
 
-# For Google Drive OCR
-pip install google-api-python-client oauth2client PyPDF2
-
-# Install all dependencies at once
-pip install pdf2image pillow img2pdf google-api-python-client oauth2client PyPDF2
+# Or install from requirements.txt
+pip install -r requirements.txt
 ```
 
-### System Dependencies
+### Alternative Backends
 
-**pdf2image requires poppler-utils:**
+**Option 1: pypdfium2 (Recommended)** ⭐
+```bash
+pip install pypdfium2 pillow img2pdf
+```
+- No system dependencies
+- Works on Windows without Poppler
+- MIT license
+
+**Option 2: PyMuPDF (Fastest)**
+```bash
+pip install PyMuPDF pillow img2pdf
+```
+- Very fast performance
+- No system dependencies
+- AGPL license (requires source disclosure)
+
+**Option 3: pdf2image (Legacy)**
+```bash
+pip install pdf2image pillow img2pdf
+```
+Plus system dependencies:
 
 - **Ubuntu/Debian:**
   ```bash
@@ -83,23 +106,29 @@ python pdf_toolkit.py <command> [options]
 Convert a text-based PDF to an image-based PDF without OCR:
 
 ```bash
-# Basic conversion (uses high quality defaults: 200 DPI, 95% quality)
+# Basic conversion (auto-selects best backend, 200 DPI, 95% quality)
 python pdf_toolkit.py convert input.pdf
 
 # Specify output file
 python pdf_toolkit.py convert input.pdf -o output.pdf
 
+# Use specific backend
+python pdf_toolkit.py convert input.pdf --backend pypdfium2
+python pdf_toolkit.py convert input.pdf --backend pymupdf
+python pdf_toolkit.py convert input.pdf --backend pdf2image
+
 # Custom DPI and quality
 python pdf_toolkit.py convert input.pdf --dpi 150 --quality 85
 
-# Full example
-python pdf_toolkit.py convert telugu_book.pdf -o telugu_image.pdf --dpi 200 --quality 95
+# Full example with all options
+python pdf_toolkit.py convert telugu_book.pdf -o telugu_image.pdf --backend pypdfium2 --dpi 200 --quality 95
 ```
 
 **Options:**
 - `-o, --output`: Output PDF file (default: `<input>_image.pdf`)
 - `--dpi`: Resolution in DPI (default: 200)
 - `--quality`: JPEG quality 1-100 (default: 95)
+- `--backend`: PDF backend (pypdfium2/pymupdf/pdf2image, default: auto-select)
 
 #### 2. OCR Single File (Automatic High-Quality Conversion + OCR)
 

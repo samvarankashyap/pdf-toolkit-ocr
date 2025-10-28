@@ -20,7 +20,7 @@ setup(
     long_description_content_type="text/markdown",
     url="https://github.com/samvarankashyap/pdf-toolkit-ocr",
     py_modules=["pdf_toolkit"],
-    python_requires=">=3.8",
+    python_requires=">=3.10",
     install_requires=[
         "pdf2image>=1.17.0",
         "Pillow>=12.0.0",

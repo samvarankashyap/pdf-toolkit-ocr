@@ -1,5 +1,15 @@
 # PDF to Image Conversion Dependencies
-pdf2image==1.17.0
+# Choose ONE of the following backends (or install multiple for flexibility):
+# 1. pypdfium2 (RECOMMENDED - no external dependencies, MIT license)
+pypdfium2==5.0.0
+
+# 2. PyMuPDF (fast, but AGPL license)
+# PyMuPDF==1.25.3
+
+# 3. pdf2image (requires external Poppler installation)
+# pdf2image==1.17.0
+
+# Common dependencies for all backends
 Pillow==12.0.0
 img2pdf==0.6.1
 

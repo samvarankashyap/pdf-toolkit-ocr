@@ -2,6 +2,11 @@
 """
 PDF Toolkit - Unified tool for PDF conversion and OCR processing
 Combines PDF to Image PDF conversion and Google Drive OCR functionality.
+
+Supports multiple PDF rendering backends:
+- pypdfium2 (recommended, no external dependencies, MIT license)
+- PyMuPDF/fitz (fast, AGPL license)
+- pdf2image (requires Poppler installation)
 """
 
 import argparse
@@ -12,16 +17,46 @@ from typing import List, Optional, Dict
 import io
 import fnmatch
 import datetime
+from enum import Enum
 
 
-# PDF to Image PDF dependencies
+# Check available PDF to Image backends
+class PDFBackend(Enum):
+    """Available PDF rendering backends"""
+    PYPDFIUM2 = "pypdfium2"
+    PYMUPDF = "pymupdf"
+    PDF2IMAGE = "pdf2image"
+
+
+# Try to import pypdfium2 (recommended, no external dependencies)
+try:
+    import pypdfium2 as pdfium
+    from PIL import Image
+    import img2pdf
+    PYPDFIUM2_AVAILABLE = True
+except ImportError:
+    PYPDFIUM2_AVAILABLE = False
+
+# Try to import PyMuPDF (fitz)
+try:
+    import fitz  # PyMuPDF
+    from PIL import Image
+    import img2pdf
+    PYMUPDF_AVAILABLE = True
+except ImportError:
+    PYMUPDF_AVAILABLE = False
+
+# Try to import pdf2image (requires Poppler)
 try:
     from pdf2image import convert_from_path
     from PIL import Image
     import img2pdf
-    PDF_TO_IMAGE_AVAILABLE = True
+    PDF2IMAGE_AVAILABLE = True
 except ImportError:
-    PDF_TO_IMAGE_AVAILABLE = False
+    PDF2IMAGE_AVAILABLE = False
+
+# Check if any backend is available
+PDF_TO_IMAGE_AVAILABLE = PYPDFIUM2_AVAILABLE or PYMUPDF_AVAILABLE or PDF2IMAGE_AVAILABLE
 
 # Google Drive OCR dependencies
 try:
@@ -54,27 +89,73 @@ MIME_TYPES = {
 
 
 class PDFToImageConverter:
-    """Handles conversion of text-based PDFs to image-based PDFs"""
+    """Handles conversion of text-based PDFs to image-based PDFs with multiple backend support"""
 
-    def __init__(self, dpi: int = DEFAULT_DPI, jpeg_quality: int = DEFAULT_JPEG_QUALITY):
+    def __init__(self, dpi: int = DEFAULT_DPI, jpeg_quality: int = DEFAULT_JPEG_QUALITY,
+                 backend: Optional[str] = None):
         """
         Initialize the PDF to Image converter.
 
         Args:
             dpi: Resolution for image conversion
             jpeg_quality: JPEG compression quality (1-100)
+            backend: PDF rendering backend ('pypdfium2', 'pymupdf', or 'pdf2image')
+                    If None, automatically selects best available backend
         """
         if not PDF_TO_IMAGE_AVAILABLE:
             raise ImportError(
-                "PDF to Image conversion requires: pdf2image, pillow, img2pdf\n"
-                "Install with: pip install pdf2image pillow img2pdf\n"
-                "Note: pdf2image requires poppler-utils:\n"
-                "  Ubuntu/Debian: sudo apt-get install poppler-utils\n"
-                "  macOS: brew install poppler\n"
-                "  Windows: Download from https://github.com/oschwartz10612/poppler-windows/releases/"
+                "PDF to Image conversion requires at least one backend:\n"
+                "1. pypdfium2 (recommended, no external dependencies):\n"
+                "   pip install pypdfium2 pillow img2pdf\n"
+                "2. PyMuPDF (fast, AGPL license):\n"
+                "   pip install PyMuPDF pillow img2pdf\n"
+                "3. pdf2image (requires Poppler):\n"
+                "   pip install pdf2image pillow img2pdf\n"
+                "   Plus Poppler installation:\n"
+                "   - Ubuntu/Debian: sudo apt-get install poppler-utils\n"
+                "   - macOS: brew install poppler\n"
+                "   - Windows: Download from https://github.com/oschwartz10612/poppler-windows/releases/"
             )
+
         self.dpi = dpi
         self.jpeg_quality = jpeg_quality
+        self.backend = self._select_backend(backend)
+
+        print(f"Using PDF rendering backend: {self.backend.value}")
+
+    def _select_backend(self, backend: Optional[str]) -> PDFBackend:
+        """
+        Select the best available PDF backend.
+
+        Priority order if backend not specified:
+        1. pypdfium2 (no external deps, MIT license)
+        2. PyMuPDF (faster but AGPL)
+        3. pdf2image (requires Poppler)
+        """
+        if backend:
+            backend_lower = backend.lower()
+            if backend_lower == "pypdfium2" and PYPDFIUM2_AVAILABLE:
+                return PDFBackend.PYPDFIUM2
+            elif backend_lower in ["pymupdf", "fitz"] and PYMUPDF_AVAILABLE:
+                return PDFBackend.PYMUPDF
+            elif backend_lower == "pdf2image" and PDF2IMAGE_AVAILABLE:
+                return PDFBackend.PDF2IMAGE
+            else:
+                raise ValueError(
+                    f"Backend '{backend}' not available. Install it or choose another.\n"
+                    f"Available backends: "
+                    f"{', '.join([b for b, avail in [('pypdfium2', PYPDFIUM2_AVAILABLE), ('pymupdf', PYMUPDF_AVAILABLE), ('pdf2image', PDF2IMAGE_AVAILABLE)] if avail])}"
+                )
+
+        # Auto-select best available backend
+        if PYPDFIUM2_AVAILABLE:
+            return PDFBackend.PYPDFIUM2
+        elif PYMUPDF_AVAILABLE:
+            return PDFBackend.PYMUPDF
+        elif PDF2IMAGE_AVAILABLE:
+            return PDFBackend.PDF2IMAGE
+        else:
+            raise ImportError("No PDF rendering backend available")
 
     def convert(self, input_pdf: Path, output_pdf: Optional[Path] = None) -> Path:
         """
@@ -106,8 +187,14 @@ class PDFToImageConverter:
         print(f"Resolution: {self.dpi} DPI")
 
         try:
-            # Convert PDF pages to images
-            images = convert_from_path(str(input_path), dpi=self.dpi)
+            # Convert PDF pages to images using selected backend
+            if self.backend == PDFBackend.PYPDFIUM2:
+                images = self._convert_with_pypdfium2(input_path)
+            elif self.backend == PDFBackend.PYMUPDF:
+                images = self._convert_with_pymupdf(input_path)
+            else:  # PDF2IMAGE
+                images = self._convert_with_pdf2image(input_path)
+
             print(f"Converted {len(images)} page(s) to images")
 
             # Convert images to bytes
@@ -147,6 +234,47 @@ class PDFToImageConverter:
                 os.remove(output_path)
                 print(f"Cleaned up partial output: {output_path}")
             raise Exception(f"Conversion failed: {str(e)}")
+
+    def _convert_with_pypdfium2(self, input_path: Path) -> List:
+        """Convert PDF to images using pypdfium2 backend"""
+        images = []
+        pdf = pdfium.PdfDocument(str(input_path))
+
+        # Calculate scale from DPI (1 pdf unit = 1/72 inch)
+        scale = self.dpi / 72
+
+        for page_num in range(len(pdf)):
+            page = pdf[page_num]
+            # Render at specified DPI
+            pil_image = page.render(scale=scale).to_pil()
+            images.append(pil_image)
+
+        return images
+
+    def _convert_with_pymupdf(self, input_path: Path) -> List:
+        """Convert PDF to images using PyMuPDF backend"""
+        images = []
+        doc = fitz.open(str(input_path))
+
+        # Calculate zoom factor from DPI
+        zoom = self.dpi / 72
+        mat = fitz.Matrix(zoom, zoom)
+
+        for page_num in range(len(doc)):
+            page = doc[page_num]
+            pix = page.get_pixmap(matrix=mat)
+
+            # Convert PyMuPDF pixmap to PIL Image
+            img_data = pix.pil_tobytes(format="JPEG", quality=self.jpeg_quality)
+            pil_image = Image.open(io.BytesIO(img_data))
+            images.append(pil_image)
+
+        doc.close()
+        return images
+
+    def _convert_with_pdf2image(self, input_path: Path) -> List:
+        """Convert PDF to images using pdf2image backend (requires Poppler)"""
+        return convert_from_path(str(input_path), dpi=self.dpi)
 
 
 class GoogleDriveOCR:
@@ -295,7 +423,8 @@ class GoogleDriveOCR:
     def ocr_pdf_chunked(self, pdf_path: Path, output_path: Optional[Path] = None,
                        keep_chunks: bool = False, delete_original: bool = False,
                        auto_convert: bool = AUTO_CONVERT_TO_IMAGE,
-                       dpi: int = DEFAULT_DPI, jpeg_quality: int = DEFAULT_JPEG_QUALITY) -> Path:
+                       dpi: int = DEFAULT_DPI, jpeg_quality: int = DEFAULT_JPEG_QUALITY,
+                       backend: Optional[str] = None) -> Path:
         """
         Process a PDF by optionally converting to image PDF, splitting into chunks, and performing OCR.
 
@@ -327,7 +456,7 @@ class GoogleDriveOCR:
         pdf_to_process = pdf_path
         if auto_convert and PDF_TO_IMAGE_AVAILABLE:
             print(f"\nConverting PDF to high-quality image PDF for better OCR...")
-            converter = PDFToImageConverter(dpi=dpi, jpeg_quality=jpeg_quality)
+            converter = PDFToImageConverter(dpi=dpi, jpeg_quality=jpeg_quality, backend=backend)
             image_pdf_path = processing_folder / f"{pdf_path.stem}_image.pdf"
             try:
                 pdf_to_process = converter.convert(pdf_path, image_pdf_path)
@@ -419,7 +548,8 @@ class GoogleDriveOCR:
                                    file_types: Optional[List[str]] = None,
                                    auto_convert: bool = AUTO_CONVERT_TO_IMAGE,
                                    dpi: int = DEFAULT_DPI,
-                                   jpeg_quality: int = DEFAULT_JPEG_QUALITY):
+                                   jpeg_quality: int = DEFAULT_JPEG_QUALITY,
+                                   backend: Optional[str] = None):
         """
         Scan directory for files and process them with OCR using organized batch folders.
 
@@ -480,7 +610,8 @@ class GoogleDriveOCR:
 
                 # Process the PDF (creates its own processing subfolder)
                 self.ocr_pdf_chunked(original_copy, output_path, keep_chunks=False,
-                                    auto_convert=auto_convert, dpi=dpi, jpeg_quality=jpeg_quality)
+                                    auto_convert=auto_convert, dpi=dpi, jpeg_quality=jpeg_quality,
+                                    backend=backend)
 
         # Process other file types
         for file_type in [ft for ft in file_types if ft != "pdf"]:
@@ -544,6 +675,8 @@ Examples:
                                help=f'Resolution in DPI (default: {DEFAULT_DPI})')
     convert_parser.add_argument('--quality', type=int, default=DEFAULT_JPEG_QUALITY,
                                help=f'JPEG quality 1-100 (default: {DEFAULT_JPEG_QUALITY})')
+    convert_parser.add_argument('--backend', type=str, choices=['pypdfium2', 'pymupdf', 'pdf2image'],
+                               help='PDF rendering backend (default: auto-select best available)')
 
     # OCR command
     ocr_parser = subparsers.add_parser('ocr',
@@ -567,6 +700,8 @@ Examples:
                            help=f'DPI for image conversion (default: {DEFAULT_DPI}, only if converting)')
     ocr_parser.add_argument('--quality', type=int, default=DEFAULT_JPEG_QUALITY,
                            help=f'JPEG quality for image conversion (default: {DEFAULT_JPEG_QUALITY}, only if converting)')
+    ocr_parser.add_argument('--backend', type=str, choices=['pypdfium2', 'pymupdf', 'pdf2image'],
+                           help='PDF rendering backend (default: auto-select best available)')
 
     # OCR batch command
     batch_parser = subparsers.add_parser('ocr-batch',
@@ -587,6 +722,8 @@ Examples:
                              help=f'DPI for image conversion (default: {DEFAULT_DPI}, only if converting)')
     batch_parser.add_argument('--quality', type=int, default=DEFAULT_JPEG_QUALITY,
                              help=f'JPEG quality for image conversion (default: {DEFAULT_JPEG_QUALITY}, only if converting)')
+    batch_parser.add_argument('--backend', type=str, choices=['pypdfium2', 'pymupdf', 'pdf2image'],
+                             help='PDF rendering backend (default: auto-select best available)')
 
     return parser
 
@@ -603,7 +740,8 @@ def main():
     try:
         if args.command == 'convert':
             # PDF to Image conversion
-            converter = PDFToImageConverter(dpi=args.dpi, jpeg_quality=args.quality)
+            backend = getattr(args, 'backend', None)
+            converter = PDFToImageConverter(dpi=args.dpi, jpeg_quality=args.quality, backend=backend)
             input_path = Path(args.input)
             output_path = Path(args.output) if args.output else None
             converter.convert(input_path, output_path)
@@ -625,6 +763,7 @@ def main():
             file_ext = input_path.suffix.lstrip('.').lower()
 
             if file_ext == 'pdf':
+                backend = getattr(args, 'backend', None)
                 ocr_processor.ocr_pdf_chunked(
                     input_path,
                     output_path,
@@ -632,7 +771,8 @@ def main():
                     delete_original=args.delete_original,
                     auto_convert=not args.no_convert,
                     dpi=args.dpi,
-                    jpeg_quality=args.quality
+                    jpeg_quality=args.quality,
+                    backend=backend
                 )
             else:
                 if output_path is None:
@@ -650,12 +790,14 @@ def main():
             if not directory.is_dir():
                 raise NotADirectoryError(f"Not a directory: {args.dir}")
 
+            backend = getattr(args, 'backend', None)
             ocr_processor.scan_and_process_directory(
                 directory,
                 args.types,
                 auto_convert=not args.no_convert,
                 dpi=args.dpi,
-                jpeg_quality=args.quality
+                jpeg_quality=args.quality,
+                backend=backend
             )
 
         print("\nOperation completed successfully!")
