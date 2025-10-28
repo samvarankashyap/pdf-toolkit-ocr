@@ -1,0 +1,173 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual Environment
+venv/
+ENV/
+env/
+.venv
+
+# PyCharm
+.idea/
+
+# VS Code
+.vscode/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+*.ipynb
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+coverage.xml
+*.cover
+.hypothesis/
+
+# Credentials and Secrets
+credentials.json
+token.json
+*.key
+*.pem
+secrets.yaml
+.env
+.env.local
+
+# PDF Files (all PDFs ignored)
+*.pdf
+
+# Text Output Files (all .txt files ignored)
+*.txt
+
+# Processing Folders
+*_processing/
+*_chunk_*.pdf
+batch_processing_*/
+
+# Image Files (large)
+*.jpg
+*.jpeg
+*.png
+*.gif
+*.bmp
+*.tiff
+!docs/images/*.png
+!docs/images/*.jpg
+
+# OS Files
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
+logs/
+
+# Temporary Files
+tmp/
+temp/
+*.tmp
+
+# Documentation Build
+docs/_build/
+docs/_static/
+docs/_templates/
+site/
+
+# MyPy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre
+.pyre/
+
+# pytype
+.pytype/
+
+# Celery
+celerybeat-schedule
+celerybeat.pid
+
+# SageMath
+*.sage.py
+
+# Spyder
+.spyderproject
+.spyproject
+
+# Rope
+.ropeproject
+
+# mkdocs
+/site
+
+# Backup files
+*.bak
+*.backup
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Archives
+*.zip
+*.tar.gz
+*.rar
+*.7z
+
+# IDE specific
+*.sublime-project
+*.sublime-workspace
+.idea
+*.iml
+
+# Windows specific
+ehthumbs.db
+Desktop.ini
+
+# Mac specific
+.AppleDouble
+.LSOverride
+Icon
+._*
+
+# Linux specific
+.directory
+.Trash-*
+
+# Original scripts (preserved locally but not in git)
+telugu_ocr_processor.py
+truepdf_to_imagepdf.py
+
+# Project specific outputs
+TRIVEDI_processing/

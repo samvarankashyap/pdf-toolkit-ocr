@@ -1,0 +1,48 @@
+# Include documentation files
+include README.md
+include LICENSE
+include CHANGELOG.md
+include CONTRIBUTING.md
+include TEST_DOCUMENTATION.md
+
+# Include requirements files
+include requirements.txt
+include requirements-dev.txt
+
+# Include configuration files
+include pyproject.toml
+include setup.py
+include .pre-commit-config.yaml
+
+# Include test files
+include test_pdf_toolkit.py
+
+# Include scripts
+include run_tests.sh
+include run_tests.bat
+
+# Exclude unnecessary files
+global-exclude __pycache__
+global-exclude *.py[co]
+global-exclude .DS_Store
+global-exclude *.swp
+global-exclude *.swo
+
+# Exclude virtual environment and build artifacts
+prune venv
+prune build
+prune dist
+prune *.egg-info
+prune htmlcov
+prune .pytest_cache
+prune .mypy_cache
+
+# Exclude credentials and sensitive files
+exclude credentials.json
+exclude token.json
+exclude *.key
+exclude *.pem
+
+# Exclude PDF files (can be large)
+exclude *.pdf
+exclude *_processing
